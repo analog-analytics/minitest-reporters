@@ -33,8 +33,7 @@ module MiniTest
                         :errors => suite_result[:error_count], :tests => suite_result[:test_count],
                         :assertions => suite_result[:assertion_count], :time => suite_result[:time]) do
             tests.each do |test, test_runner|
-              escaped_test_name = test_runner.test.to_s.gsub('"', '&quot;')
-              xml.testcase(:name => escaped_test_name, :classname => suite, :assertions => test_runner.assertions,
+              xml.testcase(:name => test_runner.test.to_s, :classname => suite, :assertions => test_runner.assertions,
                            :time => test_runner.time) do
                 xml << xml_message_for(test_runner) if test_runner.result != :pass
               end
@@ -58,16 +57,16 @@ module MiniTest
         e = test_runner.exception
 
         case test_runner.result
-          when :skip
-            xml.skipped(:type => test)
-          when :error
-            xml.error(:type => test, :message => xml.trunc!(e.message)) do
-              xml.text!(message_for(test_runner))
-            end
-          when :failure
-            xml.failure(:type => test, :message => xml.trunc!(e.message)) do
-              xml.text!(message_for(test_runner))
-            end
+        when :skip
+          xml.skipped(:type => test)
+        when :error
+          xml.error(:type => test, :message => xml.trunc!(e.message)) do
+            xml.text!(message_for(test_runner))
+          end
+        when :failure
+          xml.failure(:type => test, :message => xml.trunc!(e.message)) do
+            xml.text!(message_for(test_runner))
+          end
         end
       end
 
@@ -77,15 +76,15 @@ module MiniTest
         e = test_runner.exception
 
         case test_runner.result
-          when :pass then
-            nil
-          when :skip then
-            "Skipped:\n#{test}(#{suite}) [#{location(e)}]:\n#{e.message}\n"
-          when :failure then
-            "Failure:\n#{test}(#{suite}) [#{location(e)}]:\n#{e.message}\n"
-          when :error
-            bt = filter_backtrace(test_runner.exception.backtrace).join "\n    "
-            "Error:\n#{test}(#{suite}):\n#{e.class}: #{e.message}\n    #{bt}\n"
+        when :pass then
+          nil
+        when :skip then
+          "Skipped:\n#{test}(#{suite}) [#{location(e)}]:\n#{e.message}\n"
+        when :failure then
+          "Failure:\n#{test}(#{suite}) [#{location(e)}]:\n#{e.message}\n"
+        when :error
+          bt = filter_backtrace(test_runner.exception.backtrace).join "\n    "
+          "Error:\n#{test}(#{suite}):\n#{e.class}: #{e.message}\n    #{bt}\n"
         end
       end
 
@@ -112,7 +111,7 @@ module MiniTest
 
       def filename_for(suite)
         file_counter = 0
-        filename = "TEST-#{suite.to_s[0..240]}.xml" #restrict max filename length, to be kind to filesystems
+        filename = "TEST-#{suite.to_s[0..240].gsub(/[^a-zA-Z0-9]+/, '-')}.xml" #restrict max filename length, to be kind to filesystems
         while File.exists?(File.join(@reports_path, filename)) # restrict number of tries, to avoid infinite loops
           file_counter += 1
           filename = "TEST-#{suite}-#{file_counter}.xml"

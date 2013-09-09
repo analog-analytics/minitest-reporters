@@ -22,9 +22,15 @@ module MiniTest
 
     def self.use!(console_reporters = ProgressReporter.new, env = ENV, backtrace_filter = ExtensibleBacktraceFilter.default_filter)
       use_runner!(console_reporters, env)
-      use_before_test_hook!
       use_backtrace_filter!(backtrace_filter)
-      use_parallel_length_method!
+
+      unless defined?(@@loaded)
+        use_around_test_hooks!
+        use_parallel_length_method!
+        use_old_activesupport_fix!
+      end
+
+      @@loaded = true
     end
 
     def self.use_runner!(console_reporters, env)
@@ -33,22 +39,8 @@ module MiniTest
       Unit.runner = runner
     end
 
-    def self.use_before_test_hook!
-      if Unit::VERSION >= "3.3.0"
-        Unit::TestCase.send(:include, AroundTestHooks)
-      else
-        Unit::TestCase.send(:define_method, :before_setup) do
-          AroundTestHooks.before_test(self)
-        end
-
-        Unit::TestCase.send(:define_method, :after_teardown) do
-          AroundTestHooks.after_test(self)
-        end
-      end
-    end
-
     def self.use_backtrace_filter!(backtrace_filter)
-      if Unit::VERSION < "4.1.0"
+      if Unit::VERSION < "4.1.0" && !defined?(@@loaded)
         MiniTest.class_eval do
           class << self
             attr_accessor :backtrace_filter
@@ -61,6 +53,20 @@ module MiniTest
       end
 
       MiniTest.backtrace_filter = backtrace_filter
+    end
+
+    def self.use_around_test_hooks!
+      Unit::TestCase.class_eval do
+        def run_with_hooks(runner)
+          AroundTestHooks.before_test(self)
+          result = run_without_hooks(runner)
+          AroundTestHooks.after_test(self)
+          result
+        end
+
+        alias_method :run_without_hooks, :run
+        alias_method :run, :run_with_hooks
+      end
     end
 
     def self.choose_reporters(console_reporters, env)
@@ -80,6 +86,12 @@ module MiniTest
         ParallelEach.send(:define_method, :length) do
           @queue.length
         end
+      end
+    end
+
+    def self.use_old_activesupport_fix!
+      if defined?(ActiveSupport::VERSION) && ActiveSupport::VERSION::MAJOR < 4
+        require "minitest/old_activesupport_fix"
       end
     end
   end
